@@ -753,7 +753,7 @@ func (engine *Engine) handleHTTPRequest(c *Context) {
 			return
 		}
 		if httpMethod != http.MethodConnect && rPath != "/" {
-			if value.tsr && engine.RedirectTrailingSlash {
+			if value.tsr && engine.RedirectTrailingSlash && trailingSlashTargetExists(root, rPath, c.skippedNodes) {
 				redirectTrailingSlash(c)
 				return
 			}
@@ -786,6 +786,19 @@ func (engine *Engine) handleHTTPRequest(c *Context) {
 
 	c.handlers = engine.allNoRoute
 	serveError(c, http.StatusNotFound, default404Body)
+}
+
+// trailingSlashTargetExists reports whether rPath with its trailing slash
+// toggled matches a route. The tree's trailing-slash recommendation does not
+// always check this, and redirecting to a path without a handler only turns
+// a 404 into a redirect to a 404.
+func trailingSlashTargetExists(root *node, rPath string, skippedNodes *[]skippedNode) bool {
+	if length := len(rPath); length > 1 && rPath[length-1] == '/' {
+		rPath = rPath[:length-1]
+	} else {
+		rPath += "/"
+	}
+	return root.getValue(rPath, nil, skippedNodes, false).handlers != nil
 }
 
 var mimePlain = []string{MIMEPlain}

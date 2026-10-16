@@ -734,6 +734,29 @@ func TestMiddlewareCalledOnceByRouterStaticFSNotFound(t *testing.T) {
 	assert.Equal(t, 2, middlewareCalledNum)
 }
 
+func TestRouteRedirectTrailingSlashOnlyToExistingRoute(t *testing.T) {
+	router := New()
+	router.GET("/users/:id/posts", func(c *Context) {})
+	router.GET("/:name/x", func(c *Context) {})
+
+	// "/users/42" and "/a" are not routes: answer 404 instead of redirecting to a 404.
+	w := PerformRequest(router, http.MethodGet, "/users/42/")
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Empty(t, w.Header().Get("Location"))
+
+	w = PerformRequest(router, http.MethodGet, "/a/")
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Empty(t, w.Header().Get("Location"))
+
+	// "/b" is served by "/:p0", so the redirect is still issued.
+	router = New()
+	router.GET("/b/ab/", func(c *Context) {})
+	router.GET("/:p0", func(c *Context) {})
+	w = PerformRequest(router, http.MethodGet, "/b/")
+	assert.Equal(t, http.StatusMovedPermanently, w.Code)
+	assert.Equal(t, "/b", w.Header().Get("Location"))
+}
+
 func TestRouteRawPath(t *testing.T) {
 	route := New()
 	route.UseRawPath = true
